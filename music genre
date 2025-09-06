@@ -1,0 +1,65 @@
+import os
+import librosa
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score
+
+# Function to extract features from audio files
+def extract_features(file_path):
+    try:
+        y, sr = librosa.load(file_path, duration=30)  # Load audio file, 30s duration
+        # Extract features
+        mfccs = np.mean(librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40).T, axis=0)  # MFCC (Mel-Frequency Cepstral Coefficients)
+        chroma = np.mean(librosa.feature.chroma_stft(y=y, sr=sr).T, axis=0)      # Chroma feature
+        mel = np.mean(librosa.feature.melspectrogram(y=y, sr=sr).T, axis=0)      # Mel spectrogram
+        contrast = np.mean(librosa.feature.spectral_contrast(y=y, sr=sr).T, axis=0)  # Spectral contrast
+        tonnetz = np.mean(librosa.feature.tonnetz(y=librosa.effects.harmonic(y), sr=sr).T, axis=0)  # Tonnetz feature
+
+        features = np.hstack([mfccs, chroma, mel, contrast, tonnetz])
+        return features
+    except Exception as e:
+        print(f"Error processing {file_path}: {e}")
+        return None
+
+# Path to the GTZAN dataset (download it if you don't have it)
+data_path = data_path = "C:\\Users\\jgmid\\OneDrive\\Desktop\\Data" # E.g., genres/blues/track.wav
+
+# Dictionary to store the features and labels
+features_list = []
+labels_list = []
+
+# Iterate through the dataset and extract features
+genres = 'blues classical country disco hiphop jazz metal pop reggae rock'.split()
+for genre in genres:
+    genre_dir = os.path.join(data_path, genre)
+    for file_name in os.listdir(genre_dir):
+        file_path = os.path.join(genre_dir, file_name)
+        features = extract_features(file_path)
+        if features is not None:
+            features_list.append(features)
+            labels_list.append(genre)
+
+# Convert the features and labels into a DataFrame
+df = pd.DataFrame(features_list)
+df['label'] = labels_list
+
+# Split the data into training and testing sets
+X = df.iloc[:, :-1].values  # Features
+y = df['label'].values  # Labels
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Train a Random Forest classifier
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
+
+# Make predictions
+y_pred = model.predict(X_test)
+
+# Calculate accuracy
+accuracy = accuracy_score(y_test, y_pred)
+print(f"Accuracy: {accuracy * 100:.2f}%")
+
+# Now you can use the model to classify new songs
